@@ -1,0 +1,20 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Raw subtitles directory
+subtitles/
+*.srt
+*.vtt
+*.sbv
+
+# Operating System
+.DS_Store
+Thumbs.db

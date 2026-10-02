@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NotebookLM YouTube Subtitle Formatter</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --border-color: #475569;
+      --accent-primary: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-success: #10b981;
+      --accent-danger: #ef4444;
+      --accent-warn: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-code: #38bdf8;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .header-title h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      background-color: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+
+    .header-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    main {
+      flex: 1;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* YouTube Fetch Card */
+    .yt-fetch-card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .yt-fetch-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .yt-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .yt-title-group h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .server-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.775rem;
+      font-weight: 600;
+      padding: 0.25rem 0.7rem;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .server-badge.connected {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+
+    .server-badge.static {
+      background-color: rgba(148, 163, 184, 0.15);
+      color: #cbd5e1;
+      border-color: rgba(148, 163, 184, 0.3);
+      cursor: pointer;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    .yt-fetch-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .yt-input-wrapper {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .yt-input-wrapper input {
+      width: 100%;
+    }
+
+    .yt-lang-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .yt-lang-wrapper label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .yt-lang-wrapper input {
+      width: 65px;
+      text-align: center;
+    }
+
+    .fetch-btn {
+      white-space: nowrap;
+    }
+
+    .yt-status-alert {
+      padding: 0.65rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .yt-status-alert.info {
+      background-color: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #93c5fd;
+    }
+
+    .yt-status-alert.success {
+      background-color: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #6ee7b7;
+    }
+
+    .yt-status-alert.error {
+      background-color: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+    }
+
+    /* Options Toolbar */
+    .controls-card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .control-group label.group-label {
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    select, input[type="text"], input[type="url"], input[type="number"] {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus, input[type="url"]:focus, input[type="number"]:focus {
+      border-color: var(--accent-primary);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+      user-select: none;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      accent-color: var(--accent-primary);
+      width: 1.1rem;
+      height: 1.1rem;
+      cursor: pointer;
+    }
+
+    /* Workspace Columns */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      min-height: 520px;
+    }
+
+    @media (max-width: 900px) {
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 0.875rem 1.25rem;
+      background-color: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .panel-stats {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .dropzone-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .dropzone-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(59, 130, 246, 0.15);
+      border: 2px dashed var(--accent-primary);
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: #93c5fd;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      min-height: 480px;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      border: none;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+    }
+
+    .output-viewer {
+      flex: 1;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      padding: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      line-height: 1.6;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      user-select: text;
+    }
+
+    /* Action bar */
+    .action-bar {
+      padding: 0.75rem 1.25rem;
+      background-color: rgba(0, 0, 0, 0.2);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: var(--bg-tertiary);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--border-color);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background-color: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: #fff;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    button.success {
+      background-color: var(--accent-success);
+      border-color: var(--accent-success);
+      color: #fff;
+    }
+
+    button.success:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background-color: #065f46;
+      color: #d1fae5;
+      border: 1px solid #059669;
+      padding: 0.875rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+      transform: translateY(150%);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      left: 0; top: 0; opacity: 0;
+      width: 100%; height: 100%;
+      cursor: pointer;
+    }
+
+    /* Native Modal Dialog */
+    .modal-dialog {
+      margin: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background-color: var(--bg-secondary);
+      color: var(--text-main);
+      padding: 0;
+      max-width: 520px;
+      width: 90vw;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(3px);
+    }
+
+    .dialog-card {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+
+    .dialog-header h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      line-height: 1;
+      padding: 0 0.3rem;
+      cursor: pointer;
+    }
+
+    .close-btn:hover {
+      color: #fff;
+    }
+
+    .dialog-body {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .code-box {
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-code);
+      user-select: all;
+    }
+
+    .dialog-info-box {
+      background-color: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-size: 0.825rem;
+      color: #93c5fd;
+    }
+
+    .dialog-footer {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 0.5rem;
+    }
+
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <div class="header-title">
+        <h1>NotebookLM Subtitle Formatter</h1>
+        <span class="badge">CommonMark & RAG Optimized</span>
+      </div>
+      <p class="header-desc">Converts YouTube subtitles (.txt, .srt, .vtt, .sbv) and direct YouTube URLs into structured Markdown, preserving speaker turns (from YouTube's &gt;&gt;) and healing sentence wraps.</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- YouTube Fetch Card -->
+    <section class="yt-fetch-card" aria-labelledby="ytCardHeading">
+      <div class="yt-fetch-header">
+        <div class="yt-title-group">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="#ef4444" aria-hidden="true">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+          <h2 id="ytCardHeading">Fetch Subtitles Directly from YouTube</h2>
+        </div>
+        <div id="serverStatusBadge" class="server-badge static" title="Click for server details">
+          <span class="status-dot"></span>
+          <span id="serverStatusText">Checking server...</span>
+        </div>
+      </div>
+
+      <div class="yt-fetch-row">
+        <div class="yt-input-wrapper">
+          <input type="url" id="ytUrlInput" placeholder="Paste YouTube video or shorts URL (e.g. https://www.youtube.com/watch?v=...)" aria-label="YouTube URL">
+        </div>
+        <div class="yt-lang-wrapper">
+          <label for="ytLangInput">Lang:</label>
+          <input type="text" id="ytLangInput" value="en" placeholder="en" title="Language code (e.g. en, ja, ko, de, es)">
+        </div>
+        <button type="button" class="primary fetch-btn" id="fetchYtBtn">
+          <svg id="fetchBtnIcon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          <span id="fetchBtnText">Fetch &amp; Format</span>
+        </button>
+      </div>
+
+      <div class="yt-fetch-options" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <label class="checkbox-row" style="margin: 0;">
+          <input type="checkbox" id="keepRawServer">
+          <span>Save raw subtitle file on server (to <code>subtitles/</code> folder)</span>
+        </label>
+      </div>
+
+      <div id="ytStatusAlert" class="yt-status-alert" style="display: none;"></div>
+    </section>
+
+    <!-- Settings Controls -->
+    <div class="controls-card">
+      <div class="control-group">
+        <label for="speakerMode" class="group-label">Audio / Speaker Turn Marker</label>
+        <select id="speakerMode">
+          <option value="dash" selected>Dialogue Dash (— ) [Recommended: neutral turn marker]</option>
+          <option value="chevron">Audio Change Chevron (» ) [Like YouTube &gt;&gt;]</option>
+          <option value="bullet">Bullet Point (• )</option>
+          <option value="none">Clean Paragraphs Only (no symbol)</option>
+          <option value="alternate">Alternating (**Speaker 1 / 2:**)</option>
+          <option value="generic">Generic (**Speaker:**)</option>
+        </select>
+      </div>
+
+      <div class="control-group" id="customNamesGroup" style="display: none;">
+        <label for="customNames" class="group-label">Custom Names (comma-separated)</label>
+        <input type="text" id="customNames" placeholder="e.g. Host, Guest or Alex, Sam">
+      </div>
+
+      <div class="control-group">
+        <label for="chunkSize" class="group-label">Section Headers (## Part N)</label>
+        <select id="chunkSize">
+          <option value="0" selected>Off (no section headers)</option>
+          <option value="25">Every 25 dialogue turns</option>
+          <option value="50">Every 50 dialogue turns</option>
+          <option value="100">Every 100 dialogue turns</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label class="group-label">Timestamps &amp; Healing</label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="includeTimestamps" checked>
+          <span>Include timestamps in output</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="healSentences" checked>
+          <span>Heal broken sentence wraps</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="keepSoundTags" checked>
+          <span>Preserve [laughter], [screams]</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Workspace Grid -->
+    <div class="workspace-grid">
+      <!-- Input Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Original Subtitles / Transcript
+          </span>
+          <span class="panel-stats" id="inputStats">0 characters</span>
+        </div>
+
+        <div class="dropzone-container" id="dropzone">
+          <div class="dropzone-overlay" id="dropOverlay">Drop subtitle file here (.txt, .srt, .vtt, .sbv)</div>
+          <textarea id="rawInput" placeholder="Paste YouTube transcript here, or drag &amp; drop a .txt, .srt, .vtt, or .sbv file..."></textarea>
+        </div>
+
+        <div class="action-bar">
+          <div class="file-input-wrapper">
+            <button type="button">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+              </svg>
+              Upload Subtitle File
+            </button>
+            <input type="file" id="fileInput" accept=".txt,.srt,.vtt,.sbv">
+          </div>
+          <button type="button" id="clearBtn">Clear</button>
+        </div>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            NotebookLM Formatted Output
+          </span>
+          <span class="panel-stats" id="outputStats">0 cues formatted</span>
+        </div>
+
+        <div class="output-viewer" id="formattedOutput">Formatted Markdown will appear here...</div>
+
+        <div class="action-bar">
+          <button type="button" id="downloadRawBtn" title="Download raw unformatted subtitle (.srt, .vtt, etc.)">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Download Raw Subtitle
+          </button>
+          <button type="button" class="primary" id="copyBtn">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+            </svg>
+            Copy for NotebookLM
+          </button>
+          <button type="button" class="success" id="downloadMdBtn">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Download .md
+          </button>
+          <button type="button" id="downloadTxtBtn">Download .txt</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+    </svg>
+    <span id="toastMsg">Copied formatted transcript to clipboard!</span>
+  </div>
+
+  <!-- Help Dialog Modal for Offline / Static Mode -->
+  <dialog id="serverHelpDialog" class="modal-dialog">
+    <div class="dialog-card">
+      <div class="dialog-header">
+        <h3>Direct YouTube URL Fetching</h3>
+        <button type="button" class="close-btn" onclick="serverHelpDialog.close()" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p>To fetch subtitles directly from YouTube URLs, run the local Python backend helper:</p>
+        <div class="code-box">
+          python format_subtitles.py --serve
+        </div>
+        <p>This runs the Web UI with full <strong>yt-dlp</strong> integration at <code>http://localhost:8000</code>.</p>
+        <div class="dialog-info-box">
+          💡 <strong>Offline / Static Mode:</strong> You can also copy/paste transcript text or drag &amp; drop <code>.srt</code>, <code>.vtt</code>, <code>.sbv</code>, or <code>.txt</code> files directly into the editor below right now without needing a server!
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="primary" onclick="serverHelpDialog.close()">Understood</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    const rawInput = document.getElementById('rawInput');
+    const formattedOutput = document.getElementById('formattedOutput');
+    const speakerMode = document.getElementById('speakerMode');
+    const customNames = document.getElementById('customNames');
+    const chunkSize = document.getElementById('chunkSize');
+    const includeTimestamps = document.getElementById('includeTimestamps');
+    const healSentences = document.getElementById('healSentences');
+    const keepSoundTags = document.getElementById('keepSoundTags');
+    const inputStats = document.getElementById('inputStats');
+    const outputStats = document.getElementById('outputStats');
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadMdBtn = document.getElementById('downloadMdBtn');
+    const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const dropOverlay = document.getElementById('dropOverlay');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+
+    // YouTube Fetch Elements
+    const ytUrlInput = document.getElementById('ytUrlInput');
+    const ytLangInput = document.getElementById('ytLangInput');
+    const fetchYtBtn = document.getElementById('fetchYtBtn');
+    const fetchBtnText = document.getElementById('fetchBtnText');
+    const fetchBtnIcon = document.getElementById('fetchBtnIcon');
+    const ytStatusAlert = document.getElementById('ytStatusAlert');
+    const serverStatusBadge = document.getElementById('serverStatusBadge');
+    const serverStatusText = document.getElementById('serverStatusText');
+    const serverHelpDialog = document.getElementById('serverHelpDialog');
+
+    const keepRawServer = document.getElementById('keepRawServer');
+    const downloadRawBtn = document.getElementById('downloadRawBtn');
+
+    let currentFormattedText = '';
+    let currentFileName = 'transcript';
+    let currentRawFormat = 'srt';
+    let isServerConnected = false;
+
+    // Check if backend HTTP server is available
+    async function checkServerStatus() {
+      try {
+        const resp = await fetch('/api/status', { cache: 'no-store' });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === 'ok') {
+            isServerConnected = true;
+            serverStatusBadge.className = 'server-badge connected';
+            serverStatusText.textContent = 'Server Connected (yt-dlp active)';
+            return;
+          }
+        }
+      } catch (e) {
+        // Server not running or opened via file://
+      }
+      isServerConnected = false;
+      serverStatusBadge.className = 'server-badge static';
+      serverStatusText.textContent = 'Static Mode (Click for info)';
+    }
+
+    serverStatusBadge.addEventListener('click', () => {
+      if (!isServerConnected) {
+        serverHelpDialog.showModal();
+      } else {
+        showToast('Local server is running with yt-dlp enabled.');
+      }
+    });
+
+    // Close modal on backdrop click
+    serverHelpDialog.addEventListener('click', (e) => {
+      const rect = serverHelpDialog.getBoundingClientRect();
+      if (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      ) {
+        serverHelpDialog.close();
+      }
+    });
+
+    function showYtAlert(type, message) {
+      ytStatusAlert.className = `yt-status-alert ${type}`;
+      ytStatusAlert.textContent = message;
+      ytStatusAlert.style.display = 'block';
+    }
+
+    function hideYtAlert() {
+      ytStatusAlert.style.display = 'none';
+      ytStatusAlert.textContent = '';
+    }
+
+    // YouTube Subtitle Fetcher
+    async function handleFetchYouTube() {
+      const url = ytUrlInput.value.trim();
+      const lang = ytLangInput.value.trim() || 'en';
+
+      if (!url) {
+        showYtAlert('error', 'Please enter a valid YouTube video or shorts URL.');
+        return;
+      }
+
+      if (!isServerConnected) {
+        serverHelpDialog.showModal();
+        return;
+      }
+
+      hideYtAlert();
+      fetchYtBtn.disabled = true;
+      fetchBtnText.textContent = 'Fetching...';
+      fetchBtnIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />`;
+      fetchBtnIcon.classList.add('spin');
+
+      showYtAlert('info', `Downloading subtitle track (${lang}) via yt-dlp...`);
+
+      try {
+        const keepRawParam = (keepRawServer && keepRawServer.checked) ? '&keep_raw=1' : '';
+        const endpoint = `/api/fetch?url=${encodeURIComponent(url)}&lang=${encodeURIComponent(lang)}${keepRawParam}`;
+        const resp = await fetch(endpoint);
+        const data = await resp.json();
+
+        if (data.success) {
+          rawInput.value = data.content;
+          currentFileName = data.sanitized_title || data.title || 'youtube_transcript';
+          currentRawFormat = data.format || 'srt';
+          formatTranscript();
+          const autoLabel = data.is_auto ? 'auto-generated' : 'manual';
+          const savedMsg = data.raw_file ? ` · Saved to: ${data.raw_file}` : '';
+          showYtAlert('success', `✓ Loaded: "${data.title}" [${data.format.toUpperCase()} · ${autoLabel} captions${savedMsg}]`);
+          showToast(`Formatted subtitles for "${data.title}"`);
+        } else {
+          showYtAlert('error', `Download failed: ${data.error || 'Could not fetch subtitle stream'}`);
+        }
+      } catch (err) {
+        showYtAlert('error', `Connection error: ${err.message}. Is the python server running?`);
+      } finally {
+        fetchYtBtn.disabled = false;
+        fetchBtnText.textContent = 'Fetch & Format';
+        fetchBtnIcon.classList.remove('spin');
+        fetchBtnIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>`;
+      }
+    }
+
+    fetchYtBtn.addEventListener('click', handleFetchYouTube);
+    ytUrlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        handleFetchYouTube();
+      }
+    });
+
+    function stripHtml(text) {
+      return text.replace(/<[^>]+>/g, '');
+    }
+
+    function cleanSound(text) {
+      return text.replace(/\[[a-zA-Z0-9_\s\xa0]+\]/g, '').trim();
+    }
+
+    function splitSpeakerTurns(text, initialMarker = false) {
+      const tokens = text.split(/(?:^|\s+)(?:>>|&gt;&gt;|>)\s*/);
+      const result = [];
+      const startsWithMarker = /^(?:>>|&gt;&gt;|>)\s*/.test(text);
+      for (let i = 0; i < tokens.length; i++) {
+        const tok = tokens[i].trim();
+        if (!tok) continue;
+        const marker = (i === 0) ? (initialMarker || startsWithMarker) : true;
+        result.push({ text: tok, speakerMarker: marker });
+      }
+      return result;
+    }
+
+    function parseSubtitles(content) {
+      content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+      if (!content) return [];
+
+      // 1. WebVTT
+      if (content.startsWith('WEBVTT') || content.slice(0, 100).includes('\nWEBVTT')) {
+        return parseVtt(content);
+      }
+
+      // 2. SRT
+      if (/^\d+\s*\n\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->/m.test(content)) {
+        return parseSrt(content);
+      }
+
+      // 3. SBV
+      if (/^\d+:\d{2}:\d{2}\.\d{3},\d+:\d{2}:\d{2}\.\d{3}/m.test(content)) {
+        return parseSbv(content);
+      }
+
+      // 4. YouTube copy paste with timestamps
+      const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+      const timeMatches = lines.slice(0, 20).filter(l => /^\d{1,2}:\d{2}(?::\d{2})?$/.test(l));
+      if (timeMatches.length >= 2) {
+        return parseYouTubeCopy(lines);
+      }
+
+      // 5. Raw text with >> or line breaks
+      return parseRawText(lines);
+    }
+
+    function parseRawText(lines) {
+      const cues = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const turns = splitSpeakerTurns(trimmed, cues.length === 0);
+        for (const turn of turns) {
+          cues.push({
+            timestamp: null,
+            speakerMarker: turn.speakerMarker,
+            text: turn.text
+          });
+        }
+      }
+      return cues;
+    }
+
+    function parseSrt(content) {
+      const blocks = content.split(/\n\s*\n/);
+      const cues = [];
+      const timeRegex = /(\d{2}:\d{2}:\d{2})[,\.]\d{3}\s*-->\s*(\d{2}:\d{2}:\d{2})[,\.]\d{3}/;
+
+      for (const block of blocks) {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        if (!lines.length) continue;
+        let time = null;
+        const textLines = [];
+        for (const line of lines) {
+          const m = line.match(timeRegex);
+          if (m) {
+            time = m[1];
+          } else if (!/^\d+$/.test(line)) {
+            textLines.push(stripHtml(line));
+          }
+        }
+        if (textLines.length) {
+          const joined = textLines.join(' ');
+          const turns = splitSpeakerTurns(joined);
+          for (const turn of turns) {
+            cues.push({ timestamp: time, speakerMarker: turn.speakerMarker, text: turn.text });
+          }
+        }
+      }
+      return dedupeRolling(cues);
+    }
+
+    function parseVtt(content) {
+      const lines = content.split('\n');
+      const cues = [];
+      const timeRegex = /(\d{1,2}:)?(\d{2}:\d{2})[,\.]\d{3}\s*-->/;
+      let currentTime = null;
+      let currentText = [];
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('WEBVTT') || line.startsWith('NOTE') || line.startsWith('STYLE') || line.startsWith('Kind:') || line.startsWith('Language:')) {
+          continue;
+        }
+
+        const timeMatch = line.match(timeRegex);
+        if (timeMatch) {
+          if (currentText.length) {
+            const joined = currentText.join(' ');
+            const turns = splitSpeakerTurns(joined);
+            for (const turn of turns) {
+              cues.push({ timestamp: currentTime, speakerMarker: turn.speakerMarker, text: turn.text });
+            }
+            currentText = [];
+          }
+          const hrs = timeMatch[1] || '00:';
+          currentTime = hrs + timeMatch[2];
+          if ((currentTime.match(/:/g) || []).length === 1) currentTime = '00:' + currentTime;
+        } else {
+          const cleaned = stripHtml(line);
+          if (cleaned && !/^\d+$/.test(cleaned)) currentText.push(cleaned);
+        }
+      }
+
+      if (currentText.length) {
+        const joined = currentText.join(' ');
+        const turns = splitSpeakerTurns(joined);
+        for (const turn of turns) {
+          cues.push({ timestamp: currentTime, speakerMarker: turn.speakerMarker, text: turn.text });
+        }
+      }
+      return dedupeRolling(cues);
+    }
+
+    function parseSbv(content) {
+      const blocks = content.split(/\n\s*\n/);
+      const cues = [];
+      const timeRegex = /(\d+:\d{2}:\d{2})\.\d{3},\d+:\d{2}:\d{2}\.\d{3}/;
+
+      for (const block of blocks) {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        if (!lines.length) continue;
+        let time = null;
+        const textLines = [];
+        for (const line of lines) {
+          const m = line.match(timeRegex);
+          if (m) time = m[1];
+          else textLines.push(stripHtml(line));
+        }
+        if (textLines.length) {
+          const joined = textLines.join(' ');
+          const turns = splitSpeakerTurns(joined);
+          for (const turn of turns) {
+            cues.push({ timestamp: time, speakerMarker: turn.speakerMarker, text: turn.text });
+          }
+        }
+      }
+      return cues;
+    }
+
+    function parseYouTubeCopy(lines) {
+      const cues = [];
+      let curTime = null;
+      let curText = [];
+
+      for (const line of lines) {
+        if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(line)) {
+          if (curText.length) {
+            const joined = curText.join(' ');
+            const turns = splitSpeakerTurns(joined);
+            for (const turn of turns) {
+              cues.push({ timestamp: curTime, speakerMarker: turn.speakerMarker, text: turn.text });
+            }
+            curText = [];
+          }
+          curTime = line;
+        } else {
+          curText.push(stripHtml(line));
+        }
+      }
+      if (curText.length) {
+        const joined = curText.join(' ');
+        const turns = splitSpeakerTurns(joined);
+        for (const turn of turns) {
+          cues.push({ timestamp: curTime, speakerMarker: turn.speakerMarker, text: turn.text });
+        }
+      }
+      return cues;
+    }
+
+    function dedupeRolling(cues) {
+      if (!cues.length) return [];
+      const res = [];
+      for (const cue of cues) {
+        const t = cue.text.trim();
+        if (!t) continue;
+        if (res.length && res[res.length - 1].text === t) continue;
+        if (res.length && t.startsWith(res[res.length - 1].text)) {
+          res[res.length - 1].text = t;
+          continue;
+        }
+        res.push(cue);
+      }
+      return res;
+    }
+
+    function healContinuations(cues) {
+      if (!cues.length) return [];
+      const terminals = ['.', '?', '!', '"', "'", ']', ')'];
+      const connectors = new Set([
+        'i', 'and', 'the', 'a', 'an', 'to', 'of', 'in', 'for', 'with', 'on', 'at', 'by',
+        'from', 'as', 'into', 'like', 'or', 'so', 'but', 'because', 'if', 'when', 'where',
+        'while', 'is', 'was', 'are', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+        'my', 'your', 'his', 'her', 'our', 'their', 'uh', 'um', 'say'
+      ]);
+
+      const merged = [];
+      for (const cue of cues) {
+        const text = cue.text.trim();
+        if (!text) continue;
+
+        if (!merged.length) {
+          merged.push(Object.assign({}, cue));
+          continue;
+        }
+
+        // Never merge across explicit speaker changes
+        if (cue.speakerMarker) {
+          merged.push(Object.assign({}, cue));
+          continue;
+        }
+
+        const prevText = merged[merged.length - 1].text.trim();
+        const prefixClean = text.replace(/^[\[\(].*?[\]\)]\s*/, '').replace(/^["'‘“— ]+/, '');
+        const startsLower = prefixClean.length > 0 && prefixClean[0] === prefixClean[0].toLowerCase() && prefixClean[0] !== prefixClean[0].toUpperCase() && !prefixClean.startsWith('i ');
+
+        const endsWithPunct = prevText.endsWith(',') || prevText.endsWith(';') || prevText.endsWith(':') || prevText.endsWith('-') || prevText.endsWith('—');
+        const words = prevText.split(/\s+/);
+        const lastWord = words[words.length - 1].toLowerCase().replace(/[.,?!"']/g, '');
+        const endsWithConnector = connectors.has(lastWord);
+        const noTerminal = !terminals.some(t => prevText.endsWith(t));
+
+        const shouldMerge = startsLower || (noTerminal && (endsWithPunct || endsWithConnector));
+
+        if (shouldMerge) {
+          merged[merged.length - 1].text = prevText + ' ' + text;
+        } else {
+          merged.push(Object.assign({}, cue));
+        }
+      }
+      return merged;
+    }
+
+    function groupSpeakerTurns(cues) {
+      if (!cues.length) return [];
+      const hasMarkers = cues.some(c => c.speakerMarker);
+      if (!hasMarkers) return cues;
+
+      const turns = [];
+      let currentTurn = null;
+
+      for (const cue of cues) {
+        const isNew = cue.speakerMarker;
+        if (isNew || !currentTurn) {
+          if (currentTurn) turns.push(currentTurn);
+          currentTurn = {
+            timestamp: cue.timestamp,
+            speakerMarker: isNew,
+            texts: [cue.text]
+          };
+        } else {
+          currentTurn.texts.push(cue.text);
+        }
+      }
+      if (currentTurn) turns.push(currentTurn);
+
+      return turns.map(t => ({
+        timestamp: t.timestamp,
+        speakerMarker: t.speakerMarker,
+        text: t.texts.join(' ')
+      }));
+    }
+
+    function formatTimestamp(ts) {
+      if (!ts) return '';
+      ts = ts.replace(/[\[\]`]/g, '').trim();
+      const parts = ts.split(':');
+      if (parts.length === 3) {
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const s = parts[2];
+        try {
+          if (h === 0) {
+            return `${String(m).padStart(2, '0')}:${s}`;
+          }
+          return `${h}:${parts[1]}:${s}`;
+        } catch (e) {
+          return ts;
+        }
+      }
+      return ts;
+    }
+
+    function formatTranscript() {
+      const content = rawInput.value;
+      inputStats.textContent = `${content.length.toLocaleString()} characters`;
+
+      if (!content.trim()) {
+        formattedOutput.textContent = 'Formatted Markdown will appear here...';
+        outputStats.textContent = '0 cues formatted';
+        currentFormattedText = '';
+        return;
+      }
+
+      let cues = parseSubtitles(content);
+      if (healSentences.checked) {
+        cues = healContinuations(cues);
+        cues = groupSpeakerTurns(cues);
+      }
+
+      const mode = speakerMode.value;
+      const customNamesGroup = document.getElementById('customNamesGroup');
+      if (customNamesGroup) {
+        customNamesGroup.style.display = (mode === 'alternate') ? 'flex' : 'none';
+      }
+
+      let names = ['Speaker 1', 'Speaker 2'];
+      if (customNames.value.trim()) {
+        const split = customNames.value.split(',').map(s => s.trim()).filter(Boolean);
+        if (split.length) names = split;
+      }
+
+      const chunkInterval = parseInt(chunkSize.value, 10);
+      const keepTags = keepSoundTags.checked;
+      const showTimestamps = includeTimestamps.checked;
+
+      const lines = [];
+      lines.push(`# ${currentFileName.replace(/_/g, ' ')}\n`);
+      lines.push('> Formatted for Google NotebookLM source ingestion.\n');
+      lines.push('---\n');
+
+      let speakerIdx = 0;
+      let turnCount = 0;
+      let sectionCount = 1;
+
+      for (const cue of cues) {
+        let text = cue.text.trim();
+        if (!keepTags) text = cleanSound(text);
+        if (!text) continue;
+
+        const formattedTs = cue.timestamp ? formatTimestamp(cue.timestamp) : '';
+
+        if (chunkInterval > 0 && turnCount > 0 && turnCount % chunkInterval === 0) {
+          const timeTag = (showTimestamps && formattedTs) ? ` (${formattedTs})` : '';
+          lines.push(`\n## Part ${sectionCount + 1}${timeTag}\n`);
+          sectionCount++;
+        }
+
+        let prefix = '';
+        if (mode === 'dash') {
+          prefix = '— ';
+        } else if (mode === 'chevron') {
+          prefix = '» ';
+        } else if (mode === 'bullet') {
+          prefix = '• ';
+        } else if (mode === 'alternate') {
+          prefix = `**${names[speakerIdx % names.length]}:** `;
+          speakerIdx++;
+        } else if (mode === 'generic') {
+          prefix = '**Speaker:** ';
+        }
+
+        const timePrefix = (showTimestamps && formattedTs) ? `\`[${formattedTs}]\` ` : '';
+        lines.push(`${timePrefix}${prefix}${text}\n`);
+        turnCount++;
+      }
+
+      currentFormattedText = lines.join('\n');
+      formattedOutput.textContent = currentFormattedText;
+      outputStats.textContent = `${turnCount.toLocaleString()} dialogue turns formatted`;
+    }
+
+    function showToast(msg) {
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    // Event Listeners
+    rawInput.addEventListener('input', formatTranscript);
+    speakerMode.addEventListener('change', formatTranscript);
+    customNames.addEventListener('input', formatTranscript);
+    chunkSize.addEventListener('change', formatTranscript);
+    includeTimestamps.addEventListener('change', formatTranscript);
+    healSentences.addEventListener('change', formatTranscript);
+    keepSoundTags.addEventListener('change', formatTranscript);
+
+    copyBtn.addEventListener('click', async () => {
+      if (!currentFormattedText) return;
+      try {
+        await navigator.clipboard.writeText(currentFormattedText);
+        showToast('Copied to clipboard! Ready to paste into NotebookLM.');
+      } catch (err) {
+        // Fallback copy
+        const ta = document.createElement('textarea');
+        ta.value = currentFormattedText;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Copied to clipboard! Ready to paste into NotebookLM.');
+      }
+    });
+
+    function downloadFile(ext, mime) {
+      if (!currentFormattedText) return;
+      const blob = new Blob([currentFormattedText], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentFileName}_notebooklm.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    downloadMdBtn.addEventListener('click', () => downloadFile('md', 'text/markdown'));
+    downloadTxtBtn.addEventListener('click', () => downloadFile('txt', 'text/plain'));
+
+    downloadRawBtn.addEventListener('click', async () => {
+      const rawText = rawInput.value;
+      if (!rawText.trim()) {
+        showToast('No raw subtitle content to download!');
+        return;
+      }
+      const ext = currentRawFormat || 'srt';
+
+      // If connected to local server, also save directly into subtitles/ folder on server
+      if (isServerConnected) {
+        try {
+          const resp = await fetch('/api/save_raw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: currentFileName,
+              format: ext,
+              content: rawText,
+              raw_dir: 'subtitles'
+            })
+          });
+          const data = await resp.json();
+          if (data.success) {
+            showToast(`Saved to server: ${data.path}`);
+          }
+        } catch (e) {
+          // Fall through to browser download
+        }
+      }
+
+      const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `subtitles_${currentFileName}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (!isServerConnected) {
+        showToast(`Downloaded raw subtitle file (${ext.toUpperCase()})`);
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      rawInput.value = '';
+      currentFileName = 'transcript';
+      formatTranscript();
+      hideYtAlert();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const extMatch = file.name.match(/\.([^/.]+)$/);
+      if (extMatch) currentRawFormat = extMatch[1].toLowerCase();
+      currentFileName = file.name.replace(/\.[^/.]+$/, '');
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        rawInput.value = event.target.result;
+        formatTranscript();
+      };
+      reader.readAsText(file);
+    });
+
+    // Drag and drop support
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropOverlay.style.display = 'flex';
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropOverlay.style.display = 'none';
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const extMatch = file.name.match(/\.([^/.]+)$/);
+      if (extMatch) currentRawFormat = extMatch[1].toLowerCase();
+      currentFileName = file.name.replace(/\.[^/.]+$/, '');
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        rawInput.value = event.target.result;
+        formatTranscript();
+      };
+      reader.readAsText(file);
+    });
+
+    // Initialize server status check on page load
+    checkServerStatus();
+  </script>
+</body>
+</html>
